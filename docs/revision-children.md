@@ -1,6 +1,6 @@
 # Revision 如何落下 Deployment 和 Service
 
-这篇笔记说明一个 Revision 如何变成 Deployment 和 PodAutoscaler，KPA 如何写 ServerlessService 并改副本，SKS 如何再写 public Service、private Service 和 public Endpoints。Service 到 Revision 的上半段见 [Service 如何写出 Configuration 和 Route](service-reconcile.md)。public Service 的 Endpoints 最终被 VirtualService 使用，Ingress 那一跳见 [net-istio 如何把 Ingress 收成 VirtualService](../net-istio/kingress-to-virtualservice.md)。
+这篇笔记说明一个 Revision 如何变成 Deployment 和 PodAutoscaler，KPA 如何写 ServerlessService 并改副本，SKS 如何再写 public Service、private Service 和 public Endpoints。Service 到 Revision 的上半段见 [Service 如何写出 Configuration 和 Route](service-reconcile.md)。public Service 的 Endpoints 最终被 VirtualService 使用，Ingress 那一跳见 [net-istio 如何把 Ingress 收成 VirtualService](kingress-to-virtualservice.md)。
 
 源码基线是本地 `knative-serving` 检出，tag `knative-v1.23.0`，commit `7ed4aa2ab601e3a33c6552285f6e0d910747351d`。
 
@@ -154,3 +154,13 @@ private 有就绪地址时 `MarkEndpointsReady`，否则 `MarkEndpointsNotReady`
 Image `echo-server-00001-cache-user-container` 存在，镜像已经解析成 `ghcr.io/knative/helloworld-go@sha256:a97656c57f547d668318eb45c4c44c4cb0667892c055b40355b37859918c5c18`。public Service 和 private Service 分别是 `echo-server-00001`、`echo-server-00001-private`。
 
 空闲之后再次读取，`default` 命名空间里没有 Pod。PodAutoscaler 的 `desiredScale` 和 `actualScale` 都是 0。Active 和 Ready 都是 False，reason 为 `NoTraffic`，message 是 `The target is not receiving traffic.`。ScaleTargetInitialized 仍是 True。SKS spec 仍是 Proxy，`numActivators` 变成 3，对得上就绪 Pod 为 0 时的算式。ActivatorEndpointsPopulated 为 True，message 是 `Revision is backed by Activator`。EndpointsPopulated 和 SKS Ready 是 Unknown，reason 为 `NoHealthyBackends`。Revision 的 Ready、ContainerHealthy、ResourcesAvailable 仍是 True，只有 Active 变成 False。Service 和 Route 也仍是 Ready。缩到零拿掉的是 Pod，不是 Revision 的 Ready，也不是对外的 Route。
+
+## 观察命令
+
+`.kube/config` 是这个实验自己的 kubeconfig。Revision 名来自 Configuration 的 `latestCreatedRevisionName`，这里的 `echo-server-00001` 对应当时的 generation 1。
+
+```bash
+kubectl --kubeconfig .kube/config -n default get revision,deploy,podautoscaler,serverlessservice,svc
+kubectl --kubeconfig .kube/config -n default get podautoscaler echo-server-00001 -o jsonpath='{.status.desiredScale}{" "}{.status.actualScale}{"\n"}'
+kubectl --kubeconfig .kube/config -n default get serverlessservice echo-server-00001 -o jsonpath='{.spec.mode}{" "}{.spec.numActivators}{"\n"}'
+```

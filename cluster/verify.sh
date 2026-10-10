@@ -3,9 +3,9 @@
 set -euo pipefail
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
-require_context
+refresh_lab_kubeconfig
 
-kube apply -f "${ROOT}/samples/echo-server.yaml"
+kube apply -f "${ROOT}/manifests/echo-server.yaml"
 
 echo "wait for ksvc/${SAMPLE_NAME}"
 if ! kube wait --for=condition=Ready "ksvc/${SAMPLE_NAME}" -n "${SAMPLE_NAMESPACE}" --timeout=300s; then

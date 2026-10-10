@@ -1,8 +1,10 @@
-# Single control-plane node. Host ports match HOST_HTTP_PORT and HOST_HTTPS_PORT
-# in versions.env. containerPort values match NODE_HTTP_PORT and NODE_HTTPS_PORT.
-# 8080 and 8443 are left alone because another kind cluster already publishes them.
+# Single control-plane node. name matches CLUSTER_NAME in versions.env.
+# Host ports match HOST_HTTP_PORT and HOST_HTTPS_PORT.
+# containerPort values match NODE_HTTP_PORT and NODE_HTTPS_PORT.
+# 8080 and 8443 belong to the k8s-lab kind cluster. Do not map them here.
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
+name: knative
 nodes:
   - role: control-plane
     extraPortMappings:

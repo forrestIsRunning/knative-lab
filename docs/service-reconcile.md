@@ -1,6 +1,6 @@
 # Service 如何写出 Configuration 和 Route
 
-这篇笔记说明用户提交一个 `serving.knative.dev/v1 Service` 之后，`controller` 进程如何保证同名 Configuration 和 Route 存在，以及 Configuration 控制器如何为当前 generation 再写一个 Revision。Revision 再往下写的 Deployment、PodAutoscaler 和两个 Kubernetes Service 见 [Revision 如何落下 Deployment 和 Service](revision-children.md)。Route 写出的 Ingress 如何变成 VirtualService 见 [net-istio 如何把 Ingress 收成 VirtualService](../net-istio/kingress-to-virtualservice.md)。
+这篇笔记说明用户提交一个 `serving.knative.dev/v1 Service` 之后，`controller` 进程如何保证同名 Configuration 和 Route 存在，以及 Configuration 控制器如何为当前 generation 再写一个 Revision。Revision 再往下写的 Deployment、PodAutoscaler 和两个 Kubernetes Service 见 [Revision 如何落下 Deployment 和 Service](revision-children.md)。Route 写出的 Ingress 如何变成 VirtualService 见 [net-istio 如何把 Ingress 收成 VirtualService](kingress-to-virtualservice.md)。
 
 源码基线是本地 `knative-serving` 检出，tag `knative-v1.23.0`，commit `7ed4aa2ab601e3a33c6552285f6e0d910747351d`。
 
@@ -25,7 +25,7 @@ Service 是用户入口，不是数据面对象。它不创建 Pod，不写 Endp
 
 Revision 不入队，是因为 Service 控制器只在 `CheckNameAvailability` 里按名字读它，不根据 Revision 的每次状态变化重新调度。Revision 就绪之后，Configuration 先改自己的 status，Configuration 的更新再把 Service 入队。所以 Service status 上的 `latestReadyRevisionName` 至少晚一轮。
 
-名字函数在 `pkg/reconciler/service/resources/names/names.go`。`Configuration` 和 `Route` 都返回 Service 自己的名字，没有后缀。`samples/echo-server.yaml` 因此对应 `configuration/echo-server` 和 `route/echo-server`。同名是所有权检查的前提：名字被别的对象占住时，控制器不会改 owner，只会在 Service 上标 NotOwned。
+名字函数在 `pkg/reconciler/service/resources/names/names.go`。`Configuration` 和 `Route` 都返回 Service 自己的名字，没有后缀。`manifests/echo-server.yaml` 因此对应 `configuration/echo-server` 和 `route/echo-server`。同名是所有权检查的前提：名字被别的对象占住时，控制器不会改 owner，只会在 Service 上标 NotOwned。
 
 ## 一轮先写 Configuration
 
@@ -122,4 +122,13 @@ Service 自己的 status 要等下一轮。它看到 Configuration 的 observed 
 
 Ready 之后，Service 和 Configuration 的 `latestCreatedRevisionName`、`latestReadyRevisionName` 都是 `echo-server-00001`。Route `echo-server` 的对外 URL 是 `http://echo-server.default.example.com`，`status.address.url` 是 `http://echo-server.default.svc.cluster.local`。status traffic 已经把 Configuration 目标换成 `revisionName: echo-server-00001`。Route 的 CertificateProvisioned 为 True，reason 是 `TLSNotEnabled`，message 是 `external-domain-tls is not enabled`。这个实验没有开外部 TLS，这条 condition 表示「不需要证书」，不是证书签发失败。
 
-`curl -H "Host: echo-server.default.example.com" http://127.0.0.1:18080` 的响应体是 `Hello World!`。空闲之后再次读取，Service、Configuration 和 Route 仍是 Ready，`default` 命名空间里已经没有 Pod。缩到零改的是 Revision 下面的副本和 SKS，不把 Service 标成未就绪。细节见下一篇。
+`curl -H "Host: echo-server.default.example.com" http://127.0.0.1:18080` 的响应体是 `Hello World!`。空闲之后再次读取，Service、Configuration 和 Route 仍是 Ready，`default` 命名空间里已经没有 Pod。缩到零改的是 Revision 下面的副本和 SKS，不把 Service 标成未就绪。细节见 [Revision 如何落下 Deployment 和 Service](revision-children.md)。
+
+## 观察命令
+
+下面的命令读仓库里的 `.kube/config`，不改 `~/.kube/config` 的 current-context。`echo-server-00001` 是这次 generation 1 的 Revision 名，下一次 generation 后缀会变。
+
+```bash
+kubectl --kubeconfig .kube/config -n default get ksvc,configuration,route echo-server
+kubectl --kubeconfig .kube/config -n default get ksvc echo-server -o jsonpath='{.status.latestReadyRevisionName}{"\n"}{.status.url}{"\n"}'
+```

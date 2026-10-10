@@ -1,6 +1,6 @@
 # net-istio 如何把 Ingress 收成 VirtualService
 
-这篇笔记说明 Route 控制器如何把流量写成 `networking.internal.knative.dev/v1alpha1 Ingress`，以及 `net-istio-controller` 如何只处理 Istio 这一类 Ingress，再写成 VirtualService。Service 到 Route 的上半段见 [Service 如何写出 Configuration 和 Route](../serving/service-reconcile.md)。Revision 侧的 public Service 见 [Revision 如何落下 Deployment 和 Service](../serving/revision-children.md)。
+这篇笔记说明 Route 控制器如何把流量写成 `networking.internal.knative.dev/v1alpha1 Ingress`，以及 `net-istio-controller` 如何只处理 Istio 这一类 Ingress，再写成 VirtualService。Service 到 Route 的上半段见 [Service 如何写出 Configuration 和 Route](service-reconcile.md)。Revision 侧的 public Service 见 [Revision 如何落下 Deployment 和 Service](revision-children.md)。
 
 两份源码都钉在 tag `knative-v1.23.0`。Serving commit 是 `7ed4aa2ab601e3a33c6552285f6e0d910747351d`。net-istio commit 是 `25e9acac172051c3f9c8873fca520128fc9a1d3a`。
 
@@ -106,3 +106,11 @@ Ingress `echo-server` Ready。注解 `networking.knative.dev/ingress.class` 是 
 `echo-server-mesh` 的 gateway 是 `mesh`。hosts 包括 `echo-server.default`、`echo-server.default.svc` 和 `echo-server.default.svc.cluster.local`，没有 `example.com` 这一条。mesh 规则不对外发布域名。
 
 没有第三份 VirtualService，也没有按 `echo-server-00001` 命名的 Gateway。Route 的 CertificateProvisioned 为 True，reason `TLSNotEnabled`。空闲、Pod 已经没有之后，Ingress 和两份 VirtualService 仍在，Route 的 URL 仍是 `http://echo-server.default.example.com`。
+
+## 观察命令
+
+```bash
+kubectl --kubeconfig .kube/config -n default get ingress.networking.internal.knative.dev,virtualservice
+kubectl --kubeconfig .kube/config -n default get virtualservice echo-server-ingress -o jsonpath='{.spec.gateways}{"\n"}{.spec.hosts}{"\n"}'
+kubectl --kubeconfig .kube/config -n default get virtualservice echo-server-mesh -o jsonpath='{.spec.gateways}{"\n"}{.spec.hosts}{"\n"}'
+```

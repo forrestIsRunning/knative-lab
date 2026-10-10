@@ -47,7 +47,8 @@ systemctl restart containerd
 EOF
 }
 
-if kind get clusters | grep -qx "${CLUSTER_NAME}"; then
+mkdir -p "${ROOT}/.kube"
+if env -u KUBECONFIG kind get clusters | grep -qx "${CLUSTER_NAME}"; then
   echo "kind cluster ${CLUSTER_NAME} already exists; leaving it in place"
 else
   proxy_src="${http_proxy:-${HTTP_PROXY:-}}${https_proxy:-${HTTPS_PROXY:-}}"
@@ -57,20 +58,23 @@ else
     echo "creating kind cluster with proxy ${create_https:-${create_http}}"
     HTTP_PROXY="${create_http}" HTTPS_PROXY="${create_https}" \
       http_proxy="${create_http}" https_proxy="${create_https}" \
-      kind create cluster \
+      env -u KUBECONFIG kind create cluster \
         --name "${CLUSTER_NAME}" \
         --image "${KIND_NODE_IMAGE}" \
-        --config "${ROOT}/cluster/kind.yaml"
+        --config "${ROOT}/cluster/kind.yaml" \
+        --kubeconfig "${LAB_KUBECONFIG}"
   else
-    kind create cluster \
+    env -u KUBECONFIG kind create cluster \
       --name "${CLUSTER_NAME}" \
       --image "${KIND_NODE_IMAGE}" \
-      --config "${ROOT}/cluster/kind.yaml"
+      --config "${ROOT}/cluster/kind.yaml" \
+      --kubeconfig "${LAB_KUBECONFIG}"
   fi
 fi
+# Refresh from kind's own store. This write stays inside the repo .kube/ and
+# does not switch ~/.kube/config current-context. make register does that merge.
+refresh_lab_kubeconfig
 fix_node_image_proxy
-
-require_context
 
 apply_with_retry() {
   local url="$1"
