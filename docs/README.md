@@ -4,7 +4,7 @@
 
 ## 先读
 
-1. [`overview.md`](./overview.md) — 背景、目标、四层对象、请求经过谁、缩到零后谁还在。
+1. [`overview.md`](./overview.md) — 背景、目标、Knative 1.23 官方架构图，以及本机 `echo-server` 怎么对上这些图。
 2. [`../README.md`](../README.md) — 这个仓库是什么。
 
 ## 某一层的分叉

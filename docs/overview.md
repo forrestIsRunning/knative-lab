@@ -18,6 +18,28 @@ Knative Serving 在 Deployment 外面再加一层。用户只提交一份 `Servi
 
 版本是 Knative Serving `knative-v1.23.0`（commit `7ed4aa2ab601`）和同一 tag 的 net-istio（commit `25e9acac1720`）。Istio 来自这份 net-istio 自带的 `istio.yaml`，gateway 镜像是 Istio 1.29.2。源码在 `~/Projects/learning/knative-serving` 和 `~/Projects/learning/knative-net-istio`。
 
+## 官方图
+
+下面四张图都钉在 Knative 1.23。前三张来自 [Serving 架构](https://knative.dev/docs/serving/architecture/) 和 [请求路径](https://knative.dev/docs/serving/request-flow/)，对象模型来自 [Serving 概述](https://knative.dev/docs/serving/) 引用的规范图。后面的小节把它们落到本机的 `echo-server` 上。
+
+Service 拥有 Configuration 和 Route。Configuration 再拥有一份份不可变的 Revision。本实验只有第一代 `echo-server-00001`。
+
+![Service 在上，Configuration 带多份 Revision，旁边是 Route](https://raw.githubusercontent.com/knative/serving/knative-v1.23.0/docs/spec/images/object_model.png)
+
+蓝色是 Knative 组件，橙色是网络层，黄色是用户容器。Controller 和 Webhook 管对象，不转发请求。Ingress Gateway 在 Proxy 模式进入 Activator，在 Serve 模式进入 Queue-Proxy。Activator 再通知 Autoscaler 把缩到零的 Revision 拉起来。本实验停在 Proxy。
+
+![Knative Serving 组件：Webhook、Controller、Activator、Queue-Proxy、Autoscaler 和 Ingress Gateway](https://raw.githubusercontent.com/knative/docs/release-1.23/docs/versioned/serving/images/serving-architecture.png)
+
+`net-*` controller 监视 Knative Ingress，再去配置 Ingress Gateway。流量从这只 Gateway 前面的 Kubernetes Service 进来。本实验的 `net-*` 是 net-istio。kind 没有云负载均衡，所以没有用图里的 DNS 指向 LoadBalancer，而是用 Host 头访问节点端口 `31080`。
+
+![Knative Ingress 被 net 控制器配置到 Ingress Gateway](https://raw.githubusercontent.com/knative/docs/release-1.23/docs/versioned/serving/images/serving-architecture-ingress.png)
+
+HTTP Router 有两条路。流量低或没有 Pod 时走 Activator；多余容量够大时直接进 Pod。两条路最后都经过 Queue-Proxy，再到用户容器。Autoscaler 在旁边看指标，不在每个请求上更新。`echo-server` 的多余突发容量是负的，所以走 Activator 那条。
+
+![请求从 HTTP Router 出发，可经 Activator，也可直接进入带 Queue-Proxy 的 Pod](https://raw.githubusercontent.com/knative/docs/release-1.23/docs/versioned/serving/images/request-flow.png)
+
+[target burst capacity](https://knative.dev/docs/serving/load-balancing/target-burst-capacity/) 那一页把 `target-burst-capacity` 的默认写成 200。`knative-v1.23.0` 源码 `defaultConfig` 里的值是 211。本机 Activator 数量按 211 对得上，见 [revision-children.md](./revision-children.md)。
+
 ## 四层对象
 
 同一份 `echo-server` 同时存在于四层。上面两层决定「发布哪一版、域名是什么」。下面两层决定「现在有没有 Pod、入口把 Host 送到哪」。

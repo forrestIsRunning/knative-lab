@@ -29,7 +29,7 @@ flowchart LR
   ACT --> REV
 ```
 
-这张图是本实验的实际走法：VirtualService 先到 Activator，再进 Revision 的 Pod。对象全名、以及没有请求之后谁还在，写在总图里。
+这张图是本实验的实际走法：VirtualService 先到 Activator，再进 Revision 的 Pod。Knative 1.23 文档里的对象模型、组件、入口和请求两条路，也贴在总图里。
 
 阅读顺序和每一层的分叉在 [`docs/README.md`](./docs/README.md)。Activator 如何排队、Queue-Proxy 如何统计，写在 [这篇笔记](https://www.forrestisrunning.tech/article/knative)。
 
