@@ -15,9 +15,9 @@
 
 | 目录 | 内容 |
 | --- | --- |
-| [serving/service-reconcile.md](serving/service-reconcile.md) | Service 如何保证同名 Configuration 和 Route，Configuration 如何再写 Revision |
-| [serving/revision-children.md](serving/revision-children.md) | Revision 如何写 Deployment 和 PodAutoscaler，KPA 如何写 ServerlessService，SKS 如何写 public / private Service |
-| [net-istio/kingress-to-virtualservice.md](net-istio/kingress-to-virtualservice.md) | Route 写出的 Ingress 如何被 net-istio 收成 VirtualService |
+| [serving/service-reconcile.md](serving/service-reconcile.md) | Service 如何保证同名 Configuration 和 Route，BYO 名字和所有权失败时停在哪一步，Configuration 如何再写 Revision |
+| [serving/revision-children.md](serving/revision-children.md) | Revision、KPA、SKS 三段写回。包含默认突发容量下 Activator 数量怎么算，以及缩到零之后哪些 status 仍为 True |
+| [net-istio/kingress-to-virtualservice.md](net-istio/kingress-to-virtualservice.md) | Route 如何占名并写 Ingress，net-istio 何时不造 per-ingress Gateway，两份 VirtualService 各挂什么 |
 
 ## 集群
 
