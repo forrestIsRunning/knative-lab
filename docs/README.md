@@ -1,26 +1,22 @@
 # 文档阅读顺序
 
-本仓库记录 kind 集群 `knative` 上的 Knative Serving 和 net-istio。笔记按控制器分段。数据面，包括 Activator 排队、Queue-Proxy 和请求进 Pod 的路径，写在博客里，不要和这里的控制面笔记当成同一篇。
+先看架构，再按需要看某一层怎么做决定。集群命令单独放，不写进对象说明。
 
 ## 先读
 
-1. [`overview.md`](./overview.md) — Service、Revision、net-istio 三段各写什么，以及哪些事实不能混。
-2. 根目录 [`../README.md`](../README.md) — `make create` / `make verify` 和端口。
+1. [`overview.md`](./overview.md) — 背景、目标、四层对象、请求经过谁、缩到零后谁还在。
+2. [`../README.md`](../README.md) — 这个仓库是什么。
 
-## 按控制器
+## 某一层的分叉
 
-| 控制器 | 文档 | 本机能跑到哪 |
+| 顺序 | 文档 | 这层决定什么 |
 |---|---|---|
-| Service、Configuration | [`service-reconcile.md`](./service-reconcile.md) | `ksvc/echo-server` Ready，Revision `echo-server-00001` |
-| Revision、KPA、SKS | [`revision-children.md`](./revision-children.md) | 有流量时 Activator 数 4；缩到零后副本 0，Activator 数 3，Revision 仍 Ready |
-| Route、net-istio | [`kingress-to-virtualservice.md`](./kingress-to-virtualservice.md) | 两份 VirtualService；没有 per-ingress Gateway，也没有 per-revision VirtualService |
+| 配置和流量 | [`service-reconcile.md`](./service-reconcile.md) | 同名 Configuration / Route 何时创建，何时停下 |
+| 副本 | [`revision-children.md`](./revision-children.md) | 为什么停在 Proxy，Activator 数为什么是 4 然后变成 3 |
+| 入口 | [`kingress-to-virtualservice.md`](./kingress-to-virtualservice.md) | 为什么是两份 VirtualService，而且不另造 Gateway |
 
-示例清单是 [`../manifests/echo-server.yaml`](../manifests/echo-server.yaml)。`make verify` 提交它。
+## 操作
 
-## 不在本仓库
+[`cluster.md`](./cluster.md) — `make create`、端口、kubeconfig。
 
-- 数据面长文在 [Knative：Service、Revision 与 Scale-to-Zero](https://www.forrestisrunning.tech/article/knative)。这里不重写 Activator、Queue-Proxy、指标、WASM 和 session affinity。
-- 上游源码 clone 在 `~/Projects/learning/knative-serving` 和 `~/Projects/learning/knative-net-istio`，tag 都是 `knative-v1.23.0`。本仓库不收录源码。
-- 不安装 Eventing、Kafka、RabbitMQ、cert-manager、HPA、Functions。
-- 不打开全命名空间的 sidecar 注入。
-- kind 集群 `k8s-lab`（context `kind-k8s-lab`，宿主机端口 `8080` / `8443`）是另一个仓库的集群。本仓库不创建、不删除它。
+数据面长文在 [Knative：Service、Revision 与 Scale-to-Zero](https://www.forrestisrunning.tech/article/knative)。源码不在本仓库，clone 在 `~/Projects/learning/knative-serving` 和 `~/Projects/learning/knative-net-istio`。
