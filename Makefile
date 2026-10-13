@@ -52,15 +52,20 @@ kubeconfig:
 
 register:
 	@test -n "$$($(KIND) get clusters | grep -x $(CLUSTER))" || (echo "kind cluster $(CLUSTER) is not present" >&2; exit 1)
-	@current=$$($(KUBECTL_SYS) config current-context); \
+	@mkdir -p "$(dir $(SYS_KUBECONFIG))"
+	@current=$$($(KUBECTL_SYS) config current-context 2>/dev/null || true); \
 	$(KIND) export kubeconfig --name $(CLUSTER) --kubeconfig $(SYS_KUBECONFIG); \
-	$(KUBECTL_SYS) config use-context "$$current" >/dev/null; \
-	got=$$($(KUBECTL_SYS) config current-context); \
-	if [ "$$got" != "$$current" ]; then \
-	  echo "ERROR: current-context is $$got, expected $$current"; \
-	  exit 1; \
-	fi; \
-	echo "registered $(CONTEXT); current-context still $$got"
+	if [ -z "$$current" ]; then \
+	  echo "registered $(CONTEXT); no previous current-context"; \
+	else \
+	  $(KUBECTL_SYS) config use-context "$$current" >/dev/null; \
+	  got=$$($(KUBECTL_SYS) config current-context); \
+	  if [ "$$got" != "$$current" ]; then \
+	    echo "ERROR: current-context is $$got, expected $$current"; \
+	    exit 1; \
+	  fi; \
+	  echo "registered $(CONTEXT); current-context still $$got"; \
+	fi
 
 unregister:
 	@bash -c 'source cluster/lib.sh && unregister_system_context'

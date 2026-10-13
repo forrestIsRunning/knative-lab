@@ -138,6 +138,28 @@ if "annotations" in svc["metadata"]:
 json.dump({"apiVersion": "v1", "kind": "Service", "metadata": meta, "spec": svc["spec"]}, sys.stdout)
 ' | kube apply -f -
 
+# Istio's manifest runs three control planes (500m each) and three ingress
+# gateways (1 CPU each). A 4 CPU kind node cannot schedule that beside
+# Knative. Larger machines keep the published replica counts.
+scale_istio_for_small_nodes() {
+  local cpu millis
+  cpu="$(kube get nodes -o jsonpath='{.items[0].status.allocatable.cpu}')"
+  if [[ "${cpu}" == *m ]]; then
+    millis="${cpu%m}"
+  else
+    millis=$((cpu * 1000))
+  fi
+  if (( millis >= 8000 )); then
+    return 0
+  fi
+  echo "allocatable CPU ${cpu} is below 8; running one Istio control plane and one ingress gateway"
+  kube -n istio-system patch hpa/istiod --type merge --patch '{"spec":{"minReplicas":1}}'
+  kube -n istio-system scale deployment/istiod --replicas=1
+  kube -n istio-system scale deployment/istio-ingressgateway --replicas=1
+}
+
+scale_istio_for_small_nodes
+
 wait_namespace() {
   local ns="$1"
   local deadline=$((SECONDS + 600))
@@ -159,5 +181,36 @@ wait_namespace() {
 
 wait_namespace istio-system
 wait_namespace knative-serving
+
+# kube-proxy's iptables mode needs the xt_statistic match. This VM kernel does
+# not ship it, so NodePort rules never install and the host gateway resets.
+# nftables mode programs the same NodePorts without that match.
+ensure_kube_proxy_nftables() {
+  # /proc inside the node is the host kernel. Docker Desktop's Mac host has
+  # no iptables proc file; the Linux VM that runs the node does.
+  if docker exec "${CLUSTER_NAME}-control-plane" grep -qw statistic /proc/net/ip_tables_matches 2>/dev/null; then
+    return 0
+  fi
+  local mode
+  mode="$(kube -n kube-system get cm/kube-proxy -o jsonpath='{.data.config\.conf}' | awk '/^mode:/{print $2; exit}')"
+  if [[ "${mode}" == "nftables" ]]; then
+    return 0
+  fi
+  echo "kernel has no xt_statistic match; switching kube-proxy to nftables"
+  kube -n kube-system get cm/kube-proxy -o json | python3 -c '
+import json, sys
+cm = json.load(sys.stdin)
+conf = cm["data"]["config.conf"]
+if "mode: iptables" not in conf:
+    sys.exit("kube-proxy config has no mode: iptables")
+cm["data"]["config.conf"] = conf.replace("mode: iptables", "mode: nftables", 1)
+meta = {"name": cm["metadata"]["name"], "namespace": cm["metadata"]["namespace"]}
+json.dump({"apiVersion": "v1", "kind": "ConfigMap", "metadata": meta, "data": cm["data"]}, sys.stdout)
+' | kube apply -f -
+  kube -n kube-system delete pod -l k8s-app=kube-proxy --wait=false >/dev/null
+  kube -n kube-system rollout status daemonset/kube-proxy --timeout=180s
+}
+
+ensure_kube_proxy_nftables
 
 echo "gateway: curl -H \"Host: <service>.<namespace>.${DOMAIN}\" http://127.0.0.1:${HOST_HTTP_PORT}"
